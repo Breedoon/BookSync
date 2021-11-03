@@ -48,16 +48,31 @@ class Path:
             return self.score + base_prob
         if at_ind < self.path[-1]:
             return 0  # cannot come before existing path
-        # farther away from last -> lower probability
-        return self.score * (1 + self.loc_coef(at_ind - self.path[-1]) * base_prob)
+
+        dist = at_ind - self.path[-1]
+        # farther away from last -> lower score
+        # repeated same character too much -> lower score
+        if len(self.path) > 0:
+            if dist == 0:
+                same_as_last = self.n_same_last_elements(self.path)
+                if same_as_last >= 4:
+                    return self.score - 0.1 * same_as_last
+                else:
+                    return self.score + base_prob
+            elif dist == 1:
+                return self.score + base_prob
+            else:
+                return self.score + base_prob / dist
 
     @staticmethod
-    def loc_coef(dist, coef=0.1, lowest_val=0.1):
-        """Converts distance between two chars to coeffecient to the score"""
-        scores = [0.5, 1, 0.2]  # scores[dist] - multiplier of score if the new candidate is dist away
-        if dist >= len(scores):
-            return -0.01 * dist
-        return scores[dist]
+    def n_same_last_elements(path):
+        count = 1
+        for i in range(len(path) - 1, 0, -1):
+            if path[i] == path[i - 1]:
+                count += 1
+            else:
+                break
+        return count
 
     @staticmethod
     def get_top_paths(paths_candidates, top_n=25, sort=True):
@@ -93,7 +108,7 @@ def infer_transcript_timing(mat: np.ndarray, chars: str, beam_width=25, transcri
 
     for t in range(len(mat)):
         best_paths = Path.get_top_paths(last_paths, top_n=beam_width)  # do not sort b/c doesn't matter  sort=False
-        new_paths = [Path(score=t / 10, transcript=transcript)]  # initialize with an empty path
+        new_paths = [Path(transcript=transcript)]  # initialize with an empty path
         for path in best_paths:
             for c in range(len(chars)):
                 base_prob = mat[t, c]
@@ -105,6 +120,6 @@ def infer_transcript_timing(mat: np.ndarray, chars: str, beam_width=25, transcri
                                           path=path.path + (i,),
                                           time=path.time + (t,),
                                           transcript=transcript))
-            new_paths.append(Path(path.score, path.path, path.time, transcript=transcript))  # try skipping current step
+            new_paths.append(Path(path.score + mat[t, len(chars)], path.path, path.time, transcript=transcript))  # try skipping current step
         last_paths = new_paths
     return last_paths
