@@ -2,10 +2,10 @@ import re
 import numpy as np
 
 
-def get_transcript_char_mapping(chars: str, transcript: str):
+def get_transcript_char_mapping(alph: np.array, transcript: str):
     """For each character of the alphabet, returns indices where it occurs in transcript"""
-    mapping = [[]] * len(chars)
-    for i, char in enumerate(chars):
+    mapping = [[]] * len(alph)
+    for i, char in enumerate(alph):
         mapping[i] = [i.start() for i in re.finditer(char, transcript)]
     return mapping
 
@@ -101,17 +101,17 @@ class Path:
         return [paths_candidates[i] for i in highest_inds]
 
 
-def infer_transcript_timing(mat: np.ndarray, chars: str, beam_width=25, transcript=None, **kwargs):
-    char_map = get_transcript_char_mapping(chars, transcript)
+def infer_transcript_timing(probs: np.array, alph: np.array, beam_width=25, transcript=None, **kwargs):
+    char_map = get_transcript_char_mapping(alph, transcript)
 
     last_paths = [Path(transcript=transcript)]
 
-    for t in range(len(mat)):
+    for t in range(len(probs)):
         best_paths = Path.get_top_paths(last_paths, top_n=beam_width)  # do not sort b/c doesn't matter  sort=False
         new_paths = [Path(transcript=transcript)]  # initialize with an empty path
         for path in best_paths:
-            for c in range(len(chars)):
-                base_prob = mat[t, c]
+            for c in range(len(alph)):
+                base_prob = probs[t, c]
                 for i in char_map[c]:
                     if len(path.path) > 0 and i < path.path[-1]:
                         continue
@@ -120,6 +120,7 @@ def infer_transcript_timing(mat: np.ndarray, chars: str, beam_width=25, transcri
                                           path=path.path + (i,),
                                           time=path.time + (t,),
                                           transcript=transcript))
-            new_paths.append(Path(path.score + mat[t, len(chars)], path.path, path.time, transcript=transcript))  # try skipping current step
+            new_paths.append(Path(path.score + probs[t, len(alph)], path.path, path.time,
+                                  transcript=transcript))  # try skipping current step
         last_paths = new_paths
     return last_paths
