@@ -12,8 +12,8 @@ n_cell_dim = 2048
 WINDOW_MS = 32
 STEP_MS = 20  # feature extraction window step length
 
-MODEL_PATH = '/Users/breedoon/Documents/ds-model/output_graph.pb'
-ALPHABET_PATH = 'utils/alphabet.txt'
+MODEL_PATH = 'assets/model.pb'
+ALPHABET_PATH = 'assets/alphabet.txt'
 
 alphabet = Alphabet(os.path.abspath(ALPHABET_PATH))
 
