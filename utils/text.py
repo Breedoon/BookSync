@@ -190,3 +190,15 @@ def validate_label(label):
     label = label.lower()
 
     return label if label else None
+
+
+def preprocess_transcript(true_text: str):
+    """
+    Prepares the text of the book to serve as a transcript:
+    1. Removes non-alphabetical characters
+    2. Converts newlines to spaces
+    3. Makes all characters lowercase
+    4. Pads the resulting string with spaces from each side
+
+    """
+    return ' ' + re.compile(r'\ +').sub(' ', re.compile(r'[^a-zA-Z\ ]').sub(' ', true_text)).lower() + ' '
