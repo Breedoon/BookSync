@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import gen_audio_ops as contrib_audio
 from utils.text import Alphabet
+from tqdm import tqdm
 import os
 
 n_input = 26
@@ -11,7 +12,7 @@ n_cell_dim = 2048
 WINDOW_MS = 32
 STEP_MS = 20  # feature extraction window step length
 
-MODEL_PATH = r'C:\Users\breedoon\Downloads\ds-model\output_graph.pb'
+MODEL_PATH = '/Users/breedoon/Documents/ds-model/output_graph.pb'
 ALPHABET_PATH = 'utils/alphabet.txt'
 
 alphabet = Alphabet(os.path.abspath(ALPHABET_PATH))
@@ -109,7 +110,7 @@ def infer_character_distribution(input_file_path, model_file_path=MODEL_PATH):
 
             # the frozen model only accepts input split to 16 step chunks,
             # if the inference was run from checkpoint instead (as in single inference in deepspeech script), this loop wouldn't be needed
-            for i in range(0, features_len[0], n_steps):
+            for i in tqdm(range(0, features_len[0], n_steps)):
                 chunk = features[:, i:i + n_steps, :, :]
                 chunk_length = chunk.shape[1];
                 # pad with zeros if not enough steps (len(features) % FLAGS.n_steps != 0)
