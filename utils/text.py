@@ -1,5 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
+import os
+
 import codecs
 import numpy as np
 import re
@@ -202,3 +204,20 @@ def preprocess_transcript(true_text: str):
 
     """
     return ' ' + re.compile(r'\ +').sub(' ', re.compile(r'[^a-zA-Z\ ]').sub(' ', true_text)).lower() + ' '
+
+
+def preprocess_audio(in_file, out_file='in/in.wav', start_sec=None, end_sec=None):
+    # Convert audio to correct format in a temp .wav file
+    if os.path.exists(out_file):  # remove if temp wav file already exists
+        os.remove(out_file)
+
+    cmd = f"""ffmpeg -i {in_file} -acodec pcm_s16le -ac 1 -ar 16000"""
+
+    if start_sec is not None:
+        cmd += f""" -ss {start_sec}"""
+    if end_sec is not None:
+        cmd += f""" -to {end_sec}"""
+
+    cmd += f""" {out_file}"""
+
+    os.system(cmd)
