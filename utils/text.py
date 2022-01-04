@@ -194,9 +194,9 @@ def validate_label(label):
     return label if label else None
 
 
-def preprocess_transcript(true_text: str):
+def preprocess_transcript_text(true_text: str):
     """
-    Prepares the text of the book to serve as a transcript:
+    Prepares the text of the book to serve as a transcript: 'Some cool \n text;' -> ' some cool text '
     1. Removes non-alphabetical characters
     2. Converts newlines to spaces
     3. Makes all characters lowercase
@@ -204,6 +204,31 @@ def preprocess_transcript(true_text: str):
 
     """
     return ' ' + re.compile(r'\ +').sub(' ', re.compile(r'[^a-zA-Z\ ]').sub(' ', true_text)).lower() + ' '
+
+
+def preprocess_transcript(txt_file, start_words=None, end_words=None):
+    """
+    Returns a transcript string consiting of
+    :param txt_file: path to the .txt file where the original text is stored.
+    :param str start_words: first words to be included in the transcript from the original text, lowercase
+    :param str end_words: last words to be included, also lowercase separated by spaces
+
+    >>> preprocess_transcript('Lorem ipsum dolor sit amet, consectetur adipiscing',
+    ...                       start_words='ipsum', end_words='amet consectetur')
+    ' ipsum dolor sit amet consectetur '
+    """
+
+    with open(txt_file, 'r') as f:
+        text = f.read()
+    transcript = preprocess_transcript_text(text)
+
+    start_i = transcript.find(start_words) - 1 if start_words is not None else 0
+    if end_words is not None:
+        end_i = transcript.find(end_words) + len(end_words)
+    else:
+        end_i = -1
+
+    return transcript[start_i:end_i] + ' '
 
 
 def preprocess_audio(in_file, out_file='in/in.wav', start_sec=None, end_sec=None):
@@ -221,3 +246,5 @@ def preprocess_audio(in_file, out_file='in/in.wav', start_sec=None, end_sec=None
     cmd += f""" {out_file}"""
 
     os.system(cmd)
+
+    return out_file
