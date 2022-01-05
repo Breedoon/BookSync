@@ -12,10 +12,12 @@ from functools import lru_cache
 from utils.fastdtw import fastdtw
 from matplotlib import animation
 from tqdm import tqdm
+from numpy.lib.stride_tricks import sliding_window_view
 
 
 def main():
     m = Mapper('in/02.mp3', 'in/02.txt', 89, 125, 'while these ordinary', 'psychological basis')
+    m.plot_fit()
     m.make_animation()
 
 
@@ -132,10 +134,22 @@ class Mapper:
     @property
     @lru_cache()
     def full_path(self):
-        dist, path = fastdtw(np.arange(len(self.logits)), self.transcript_inds, radius=self.radius,
-                             dist=lambda mat_i, trpt_i: -self.costs[int(mat_i), int(trpt_i)])
-        # print('fit:', -dist / len(self.logits))
-        return path
+        sliding_step = 50
+        overlap_n = 1
+        windows = np.array([np.arange(0, len(self.logits), sliding_step // overlap_n)[:-overlap_n],  # from
+                              np.arange(0, len(self.logits), sliding_step // overlap_n)[overlap_n:]]).T  # to
+        windows = np.vstack([windows, [windows[-1, -1], len(self.logits)]])  # add last steps that didn't fit in window
+        trpt_start_ind = 0
+        paths = []
+        for frm, to in tqdm(windows):
+            costs = self.costs[frm:].copy()
+            costs[to:] = 0
+            _, window_path = fastdtw(np.arange(len(costs)), self.transcript_inds[trpt_start_ind:], radius=20,
+                                     dist=lambda mat_i, trpt_i: -costs[int(mat_i), int(trpt_i)])
+            paths.append(np.array(window_path[:sliding_step]) + [frm, trpt_start_ind])
+            trpt_start_ind = trpt_start_ind + window_path[to - frm - 1][1]  # - 1
+
+        return np.vstack(paths)
 
     @property
     @lru_cache()
