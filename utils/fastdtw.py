@@ -126,13 +126,16 @@ def dtw(x, y, dist=None):
 
 
 def __dtw(x, y, window, dist):
+    from tqdm import tqdm
+
     len_x, len_y = len(x), len(y)
     if window is None:
         window = [(i, j) for i in range(len_x) for j in range(len_y)]
     window = ((i + 1, j + 1) for i, j in window)
     D = defaultdict(lambda: (float('inf'),))
     D[0, 0] = (0, 0, 0)
-    for i, j in window:
+
+    for i, j in tqdm(list(window)):
         dt = dist(x[i - 1], y[j - 1])
         D[i, j] = min((D[i - 1, j][0] + dt, i - 1, j),
                       # (D[i, j - 1][0] + dt, i, j - 1),

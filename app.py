@@ -10,13 +10,16 @@ import struct
 import wave
 from functools import lru_cache
 from utils.fastdtw import fastdtw
+from utils.fastdtw import dtw
 from matplotlib import animation
 from tqdm import tqdm
 from numpy.lib.stride_tricks import sliding_window_view
 
 
 def main():
-    m = Mapper('in/02.mp3', 'in/02.txt', 89, 125, 'while these ordinary', 'psychological basis')
+    # m = Mapper('in/02.mp3', 'in/02.txt', 89, 125, 'while these ordinary', 'psychological basis')
+    m = Mapper('in/02.mp3', 'in/02.txt', 3 * 60 + 7, 8 * 60 + 47, 'a definite number of', 'lost their validity')
+    # m = Mapper('in/02.mp3', 'in/02.txt')
     m.plot_fit()
     m.make_animation()
 
@@ -32,7 +35,6 @@ class Mapper:
         self.end_sec = end_sec
         self.start_words = start_words
         self.end_words = end_words
-        self.radius = 50
 
         self.path_cost = None
         self.wav_framerate = None
@@ -125,7 +127,8 @@ class Mapper:
     @property
     @lru_cache()
     def path(self):
-        shift_by_ts = len(self.logits) - len(self.step_samples)  # shift transcript back by 10 * 20 = 200 ms
+        true_duration_steps = len(self.samples) // (self.wav_framerate * STEP_MS // 1000)
+        shift_by_ts = len(self.logits) - true_duration_steps  # shift transcript back by 10 * 20 = 200 ms
         sub_path = np.array(self.full_path)
         sub_path[:-shift_by_ts, 1] = sub_path[shift_by_ts:, 1]
         self.path_cost = self.costs[sub_path[:, 0], self.transcript_inds[sub_path[:, 1]]]
@@ -134,22 +137,9 @@ class Mapper:
     @property
     @lru_cache()
     def full_path(self):
-        sliding_step = 50
-        overlap_n = 1
-        windows = np.array([np.arange(0, len(self.logits), sliding_step // overlap_n)[:-overlap_n],  # from
-                              np.arange(0, len(self.logits), sliding_step // overlap_n)[overlap_n:]]).T  # to
-        windows = np.vstack([windows, [windows[-1, -1], len(self.logits)]])  # add last steps that didn't fit in window
-        trpt_start_ind = 0
-        paths = []
-        for frm, to in tqdm(windows):
-            costs = self.costs[frm:].copy()
-            costs[to:] = 0
-            _, window_path = fastdtw(np.arange(len(costs)), self.transcript_inds[trpt_start_ind:], radius=20,
-                                     dist=lambda mat_i, trpt_i: -costs[int(mat_i), int(trpt_i)])
-            paths.append(np.array(window_path[:sliding_step]) + [frm, trpt_start_ind])
-            trpt_start_ind = trpt_start_ind + window_path[to - frm - 1][1]  # - 1
-
-        return np.vstack(paths)
+        dist, path = dtw(np.arange(len(self.logits)), self.transcript_inds,  # radius=self.radius,
+                         dist=lambda mat_i, trpt_i: -self.costs[int(mat_i), int(trpt_i)])
+        return path
 
     @property
     @lru_cache()
@@ -187,10 +177,21 @@ class Mapper:
 
     @property
     @lru_cache()
+    def radius(self):
+        # return 50
+        return len(self.transcript) // 2
+
+    @property
+    @lru_cache()
     def logits(self):
-        with open("assets/logits.pickle", "rb") as f:
-            return pickle.load(f)
-        # return infer_character_distribution(self.wav_audio_file)  TODO: uncomment
+        # with open("assets/logits-02.pickle", "rb") as f:
+        #     return pickle.load(f)
+
+        logits = infer_character_distribution(self.wav_audio_file)
+        with open("assets/logits.pickle", "wb") as f:
+            pickle.dump(logits, f)
+
+        return logits
 
     @property
     @lru_cache()
