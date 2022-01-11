@@ -71,8 +71,8 @@ def __fastdtw(x, y, radius, dist):
 
 
 def __prep_inputs(x, y, dist):
-    x = np.asanyarray(x, dtype='float')
-    y = np.asanyarray(y, dtype='float')
+    x = np.asanyarray(x, dtype='int')  # as int b/c assuming passed indices
+    y = np.asanyarray(y, dtype='int')
 
     if x.ndim == y.ndim > 1 and x.shape[1] != y.shape[1]:
         raise ValueError('second dimension of x and y must be the same')
@@ -151,7 +151,11 @@ def __dtw(x, y, window, dist):
 
 
 def __reduce_by_half(x):
-    return [(x[i] + x[1 + i]) / 2 for i in range(0, len(x) - len(x) % 2, 2)]
+    thickness = x.shape[1]
+    oddness = len(x) % 2
+    # Pad with -1 at the end if len is odd
+    x = np.vstack([x, np.array([-1] * thickness * oddness, dtype=int).reshape(oddness, thickness)])
+    return x.reshape(-1, thickness * 2)
 
 
 def __expand_window(path, len_x, len_y, radius):

@@ -20,7 +20,7 @@ def main():
     # m = Mapper('in/02.mp3', 'in/02.txt', 89, 125, 'while these ordinary', 'psychological basis')
     m = Mapper('in/02.mp3', 'in/02.txt', 3 * 60 + 7, 8 * 60 + 47, 'a definite number of', 'lost their validity')
     # m = Mapper('in/02.mp3', 'in/02.txt')
-    m.plot_fit()
+    # m.plot_fit()
     m.make_animation()
 
 
@@ -28,7 +28,6 @@ class Mapper:
     WAV_AUDIO_FILE = 'in/in.wav'
 
     def __init__(self, audio_file, txt_file, start_sec=None, end_sec=None, start_words=None, end_words=None):
-
         self.audio_file = audio_file
         self.txt_file = txt_file
         self.start_sec = start_sec
@@ -137,8 +136,16 @@ class Mapper:
     @property
     @lru_cache()
     def full_path(self):
-        dist, path = dtw(np.arange(len(self.logits)), self.transcript_inds,  # radius=self.radius,
-                         dist=lambda mat_i, trpt_i: -self.costs[int(mat_i), int(trpt_i)])
+        def dist(mat_inds, trpt_inds):
+            # remove -1s if any (when array was odd but needed to be reduced by half)
+            mat_inds = mat_inds[~(mat_inds == -1)]
+            trpt_inds = trpt_inds[~(trpt_inds == -1)]
+            return -self.costs[mat_inds].mean(axis=0)[trpt_inds].mean()
+
+        dist, path = fastdtw(np.arange(len(self.logits)).reshape(-1, 1),
+                             self.transcript_inds.reshape(-1, 1),
+                             radius=self.radius,
+                             dist=dist)
         return path
 
     @property
@@ -179,7 +186,7 @@ class Mapper:
     @lru_cache()
     def radius(self):
         # return 50
-        return len(self.transcript) // 2
+        return len(self.transcript) // 8
 
     @property
     @lru_cache()
