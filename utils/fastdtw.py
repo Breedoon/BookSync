@@ -5,9 +5,10 @@ from __future__ import absolute_import, division
 import numbers
 import numpy as np
 from collections import defaultdict
+from pyts.metrics import itakura_parallelogram, sakoe_chiba_band
 
 
-def fastdtw(x, y, radius=1, dist=None):
+def fastdtw(x, y, radius=1, dist=None, max_approximations=0):
     ''' return the approximate distance between 2 time series with O(N)
         time and memory complexity
 
@@ -27,6 +28,11 @@ def fastdtw(x, y, radius=1, dist=None):
             dist is an int of value p > 0, then the p-norm will be used. If
             dist is a function then dist(x[i], y[j]) will be used. If dist is
             None then abs(x[i] - y[j]) will be used.
+        max_approximations : int
+            The maximum number of recursive iterations for path band approximations
+            that fastdtw will go through before running the actual final algorithm.
+            On each iteration, fastdtw will halve both arrays and recursively run
+            itself to find path in the shortened array.
 
         Returns
         -------
@@ -45,7 +51,7 @@ def fastdtw(x, y, radius=1, dist=None):
         (2.0, [(0, 0), (1, 0), (2, 1), (3, 2), (4, 2)])
     '''
     x, y, dist = __prep_inputs(x, y, dist)
-    return __fastdtw(x, y, radius, dist)
+    return __fastdtw(x, y, radius, dist, max_approximations)
 
 
 def __difference(a, b):
@@ -56,16 +62,14 @@ def __norm(p):
     return lambda a, b: np.linalg.norm(np.atleast_1d(a) - np.atleast_1d(b), p)
 
 
-def __fastdtw(x, y, radius, dist):
-    min_time_size = radius + 2
-
-    if len(x) < min_time_size or len(y) < min_time_size:
-        return dtw(x, y, dist=dist)
+def __fastdtw(x, y, radius, dist, max_approximations, curr_approximation=0):
+    if curr_approximation >= max_approximations:
+        return dtw(x, y, radius, dist=dist)
 
     x_shrinked = __reduce_by_half(x)
     y_shrinked = __reduce_by_half(y)
     distance, path = \
-        __fastdtw(x_shrinked, y_shrinked, radius=radius, dist=dist)
+        __fastdtw(x_shrinked, y_shrinked, radius, dist, max_approximations, curr_approximation + 1)
     window = __expand_window(path, len(x), len(y), radius)
     return __dtw(x, y, window, dist=dist)
 
@@ -90,7 +94,7 @@ def __prep_inputs(x, y, dist):
     return x, y, dist
 
 
-def dtw(x, y, dist=None):
+def dtw(x, y, radius=None, dist=None):
     ''' return the distance between 2 time series without approximation
 
         Parameters
@@ -122,7 +126,7 @@ def dtw(x, y, dist=None):
         (2.0, [(0, 0), (1, 0), (2, 1), (3, 2), (4, 2)])
     '''
     x, y, dist = __prep_inputs(x, y, dist)
-    return __dtw(x, y, None, dist)
+    return __dtw(x, y, radius, dist)
 
 
 def __dtw(x, y, window, dist):
@@ -131,16 +135,29 @@ def __dtw(x, y, window, dist):
     len_x, len_y = len(x), len(y)
     if window is None:
         window = [(i, j) for i in range(len_x) for j in range(len_y)]
-    window = ((i + 1, j + 1) for i, j in window)
+
     D = defaultdict(lambda: (float('inf'),))
     D[0, 0] = (0, 0, 0)
 
-    for i, j in tqdm(list(window)):
-        dt = dist(x[i - 1], y[j - 1])
-        D[i, j] = min((D[i - 1, j][0] + dt, i - 1, j),
-                      # (D[i, j - 1][0] + dt, i, j - 1),
-                      (D[i - 1, j - 1][0] + dt, i - 1, j - 1),
-                      key=lambda a: a[0])
+    if hasattr(window, '__iter__'):  # a list of tuples
+        window = ((i + 1, j + 1) for i, j in window)
+        for i, j in tqdm(list(window)):
+            dt = dist(x[i - 1], y[j - 1])
+            D[i, j] = min((D[i - 1, j][0] + dt, i - 1, j),
+                          # (D[i, j - 1][0] + dt, i, j - 1),
+                          (D[i - 1, j - 1][0] + dt, i - 1, j - 1),
+                          key=lambda a: a[0])
+
+    elif isinstance(window, int):  # given a radius
+        js = sakoe_chiba_band(len(x), len(y), window * 2).T + 1
+        for i in tqdm(list(range(1, len(x) + 1))):
+            for j in range(*js[i - 1]):
+                dt = dist(x[i - 1], y[j - 1])
+                D[i, j] = min((D[i - 1, j][0] + dt, i - 1, j),
+                              # (D[i, j - 1][0] + dt, i, j - 1),
+                              (D[i - 1, j - 1][0] + dt, i - 1, j - 1),
+                              key=lambda a: a[0])
+
     path = []
     i, j = len_x, len_y
     while not (i == j == 0):
@@ -159,30 +176,17 @@ def __reduce_by_half(x):
 
 
 def __expand_window(path, len_x, len_y, radius):
-    path_ = set(path)
-    for i, j in path:
-        for a, b in ((i + a, j + b)
-                     for a in range(-radius, radius + 1)
-                     for b in range(-radius, radius + 1)):
-            path_.add((a, b))
+    path_arr = np.array(path)
 
-    window_ = set()
-    for i, j in path_:
-        for a, b in ((i * 2, j * 2), (i * 2, j * 2 + 1),
-                     (i * 2 + 1, j * 2), (i * 2 + 1, j * 2 + 1)):
-            window_.add((a, b))
+    short_windows = np.repeat(path_arr[:, 1, np.newaxis] + np.arange(-radius, radius + 1)[np.newaxis, :],
+                              2, axis=0)[:(len(path_arr) * 2) - len_x % 2].flatten()  # repeat for every pair of x
 
-    window = []
-    start_j = 0
-    for i in range(0, len_x):
-        new_start_j = None
-        for j in range(start_j, len_y):
-            if (i, j) in window_:
-                window.append((i, j))
-                if new_start_j is None:
-                    new_start_j = j
-            elif new_start_j is not None:
-                break
-        start_j = new_start_j
+    expanded_windows = np.array([
+        np.repeat(np.arange(len_x), 2 * (radius * 2 + 1)),  # inds of x: 0 0 0 0 0 1 1 1 1
+        np.vstack([short_windows * 2, (short_windows * 2) + 1]).T.flatten()  # inds if y
+    ]).T
 
-    return window
+    # remove ones with incorrect indices
+    windows = expanded_windows[(expanded_windows >= 0).all(axis=1) & (expanded_windows[:, 1] < len_y)]
+
+    return windows

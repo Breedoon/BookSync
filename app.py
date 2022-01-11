@@ -145,7 +145,8 @@ class Mapper:
         dist, path = fastdtw(np.arange(len(self.logits)).reshape(-1, 1),
                              self.transcript_inds.reshape(-1, 1),
                              radius=self.radius,
-                             dist=dist)
+                             dist=dist,
+                             max_approximations=1)
         return path
 
     @property
@@ -185,8 +186,7 @@ class Mapper:
     @property
     @lru_cache()
     def radius(self):
-        # return 50
-        return len(self.transcript) // 8
+        return 200
 
     @property
     @lru_cache()

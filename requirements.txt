@@ -1,5 +1,7 @@
 tensorflow==2.0.0
-numpy
+numpy==1.21.4
 pandas
 matplotlib
 tqdm
+numba==0.53
+pyts
