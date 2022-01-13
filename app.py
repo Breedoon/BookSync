@@ -36,6 +36,8 @@ class Mapper:
         self.wav_framerate = None
 
     def make_animation(self, save_to='out/out.mp4'):
+        print('Compiling an animation to visualize the result...')
+
         spaces = np.argwhere(self.transcript_inds == 0)[:, 0]
         word_starts = spaces[:-1] + 1
         word_ends = spaces[1:]  # - 1
@@ -133,6 +135,8 @@ class Mapper:
     @property
     @lru_cache()
     def full_path(self):
+        print('Running DTW to map transcript onto the probability distributions...')
+
         def dist(mat_inds, trpt_inds):
             # remove -1s if any (when array was odd but needed to be reduced by half)
             mat_inds = mat_inds[~(mat_inds == -1)]
@@ -188,7 +192,9 @@ class Mapper:
     @property
     @lru_cache()
     def logits(self):
-        # with open("assets/logits-02.pickle", "rb") as f:
+        print('Running DNN to infer character probability distributions of the audio file...')
+
+        # with open("assets/logits.pickle", "rb") as f:  # for debugging: to not have to rerun DNN on the same file
         #     return pickle.load(f)
 
         logits = infer_character_distribution(self.wav_audio_file)
