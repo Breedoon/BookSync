@@ -203,7 +203,7 @@ def preprocess_transcript_text(true_text: str):
     4. Pads the resulting string with spaces from each side
 
     """
-    return ' ' + re.compile(r'\ +').sub(' ', re.compile(r'[^a-zA-Z\ ]').sub(' ', true_text)).lower() + ' '
+    return ' ' + re.compile(r'\ +').sub(' ', re.compile(r"[^a-zA-Z\ ']").sub(' ', true_text)).lower() + ' '
 
 
 def preprocess_transcript(txt_file, start_words=None, end_words=None):
@@ -223,10 +223,7 @@ def preprocess_transcript(txt_file, start_words=None, end_words=None):
     transcript = preprocess_transcript_text(text)
 
     start_i = transcript.find(start_words) - 1 if start_words is not None else 0
-    if end_words is not None:
-        end_i = transcript.find(end_words) + len(end_words)
-    else:
-        end_i = -1
+    end_i = transcript.find(end_words) + len(end_words) if end_words is not None else -1
 
     return transcript[start_i:end_i] + ' '
 
