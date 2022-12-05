@@ -16,9 +16,38 @@ from tqdm import tqdm
 from numpy.lib.stride_tricks import sliding_window_view
 
 
-def main(audio_file, txt_file, start_sec=None, end_sec=None, start_words=None, end_words=None, save_to='out/out.mp4'):
-    m = Mapper(audio_file, txt_file, start_sec, end_sec, start_words, end_words)
-    m.make_animation(save_to=save_to)
+def main():
+    m = Mapper(  # 20-second excerpt
+        audio_file='in/02.mp3',
+        txt_file='in/02.txt',
+        start_sec=11 * 60 + 33,  # 11:33
+        end_sec=11 * 60 + 53,  # 11:53
+        start_words='with the progressive dawn',
+        end_words='destination we did not know'
+    )
+
+    # m = Mapper(  # 1-minute excerpt
+    #     audio_file='in/02.mp3',
+    #     txt_file='in/02.txt',
+    #     start_sec=89,
+    #     end_sec=125,
+    #     start_words='while these ordinary',
+    #     end_words='psychological basis'
+    # )
+
+    # m = Mapper(  # 5-minute excerpt
+    #     audio_file='in/02.mp3',
+    #     txt_file='in/02.txt',
+    #     start_sec=3 * 60 + 7,  # 3:07
+    #     end_sec=8 * 60 + 47,  # 8:47
+    #     start_words='a definite number of',
+    #     end_words='lost their validity'
+    # )
+
+    # m = Mapper('in/02.mp3', 'in/02.txt')  # full 27-minute excerpt
+
+    m.make_csv()
+    m.make_animation()
 
 
 class Mapper:
@@ -269,31 +298,4 @@ class Mapper:
 
 
 if __name__ == '__main__':
-    main(  # 20-second excerpt
-        audio_file='in/02.mp3',
-        txt_file='in/02.txt',
-        start_sec=11 * 60 + 33,  # 11:33
-        end_sec=11 * 60 + 53,  # 11:53
-        start_words='with the progressive dawn',
-        end_words='destination we did not know'
-    )
-
-    # main(  # 1-minute excerpt
-    #     audio_file='in/02.mp3',
-    #     txt_file='in/02.txt',
-    #     start_sec=89,
-    #     end_sec=125,
-    #     start_words='while these ordinary',
-    #     end_words='psychological basis'
-    # )
-
-    # main(  # 5-minute excerpt
-    #     audio_file='in/02.mp3',
-    #     txt_file='in/02.txt',
-    #     start_sec=3 * 60 + 7,  # 3:07
-    #     end_sec=8 * 60 + 47,  # 8:47
-    #     start_words='a definite number of',
-    #     end_words='lost their validity'
-    # )
-
-    # main('in/02.mp3', 'in/02.txt')  # full 27-minute excerpt
+    main()
