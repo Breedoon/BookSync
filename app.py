@@ -35,29 +35,18 @@ class Mapper:
         self.path_cost = None
         self.wav_framerate = None
 
+    def make_csv(self, save_to='out/out.csv'):
+        word_ids = np.array([self.word_id_on_step_n(step) for step in range(len(self.path))])
+        # indexes where next element != previous; word_starts[i] = first audio step of ith word
+        word_starts = np.where(word_ids[1:] != word_ids[:-1])[0] + 1
+        pd.DataFrame(word_starts, columns=['start_step']).to_csv(save_to, index_label='word_id')
+
     def make_animation(self, save_to='out/out.mp4'):
         print('Compiling an animation to visualize the result...')
 
-        spaces = np.argwhere(self.transcript_inds == 0)[:, 0]
-        word_starts = spaces[:-1] + 1
-        word_ends = spaces[1:]  # - 1
-        np.vstack([word_starts, word_ends])
-
-        ind_word_mad = pd.Series([np.nan] * len(self.transcript_inds))
-        ind_word_mad[word_starts] = np.arange(len(word_starts))
-        ind_word_mad = ind_word_mad.ffill()
-
-        # sub_path_cost[word_starts[55]:word_ends[55]].mean()
-
         def animate(step):
             plt.gca().axis('off')
-            trpt_i = self.path[step][1]
-            word_i = ind_word_mad[trpt_i]
-            if pd.isna(word_i):  # words haven't began yet
-                word = ''
-            else:
-                word_i = int(word_i)
-                word = self.transcript[word_starts[word_i]: word_ends[word_i]]
+            word = self.word_from_id(self.word_id_on_step_n(step))
             return [plt.annotate(word, xy=(0.5, 0.5), fontsize=26, ha='center', va='center')]
 
         class tqdmlist(list):
@@ -121,6 +110,45 @@ class Mapper:
         ax1.axes.get_xaxis().set_visible(False)
         plt.gcf().savefig(save_to)
         plt.show()
+
+    def word_id_on_step_n(self, n):
+        trpt_i = self.path[n][1]
+        word_i = self.trpt_id_to_word_id_map[trpt_i]
+        if pd.isna(word_i):  # words haven't begun yet
+            word_i = -1
+        else:
+            word_i = int(word_i)
+        return word_i
+
+    def word_from_id(self, word_id):
+        if word_id == -1:  # words haven't begun yet
+            return ''
+        return self.transcript[self.word_starts[word_id]: self.word_ends[word_id]]
+
+    @property
+    @lru_cache()
+    def spaces_inds(self):
+        return np.argwhere(self.transcript_inds == 0)[:, 0]
+
+    @property
+    @lru_cache()
+    def trpt_id_to_word_id_map(self):
+        ind_word_mad = pd.Series([np.nan] * len(self.transcript_inds))
+        ind_word_mad[self.word_starts] = np.arange(len(self.word_starts))
+        ind_word_mad = ind_word_mad.ffill()
+        return ind_word_mad
+
+    @property
+    @lru_cache()
+    def word_starts(self):
+        """Audio indexes of beginnings of each word in transcript"""
+        return self.spaces_inds[:-1] + 1
+
+    @property
+    @lru_cache()
+    def word_ends(self):
+        """Audio indexes right after every words ends, so that ith word is trpt[word_starts[i]: word_ends[i]]"""
+        return self.spaces_inds[1:]  # - 1
 
     @property
     @lru_cache()
