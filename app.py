@@ -17,7 +17,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 
 def main():
-    m = Mapper(  # 20-second excerpt
+    m = STSyncer(  # 20-second excerpt
         audio_file='in/02.mp3',
         txt_file='in/02.txt',
         start_sec=11 * 60 + 33,  # 11:33
@@ -26,7 +26,7 @@ def main():
         end_words='destination we did not know'
     )
 
-    # m = Mapper(  # 1-minute excerpt
+    # m = STSyncer(  # 1-minute excerpt
     #     audio_file='in/02.mp3',
     #     txt_file='in/02.txt',
     #     start_sec=89,
@@ -35,7 +35,7 @@ def main():
     #     end_words='psychological basis'
     # )
 
-    # m = Mapper(  # 5-minute excerpt
+    # m = STSyncer(  # 5-minute excerpt
     #     audio_file='in/02.mp3',
     #     txt_file='in/02.txt',
     #     start_sec=3 * 60 + 7,  # 3:07
@@ -44,13 +44,14 @@ def main():
     #     end_words='lost their validity'
     # )
 
-    # m = Mapper('in/02.mp3', 'in/02.txt')  # full 27-minute excerpt
+    # m = STSyncer('in/02.mp3', 'in/02.txt')  # full 27-minute excerpt
 
     m.make_csv()
     m.make_animation()
 
 
-class Mapper:
+class STSyncer:
+    """Speech & Text Syncer"""
     WAV_AUDIO_FILE = 'in/in.wav'
 
     def __init__(self, audio_file, txt_file, start_sec=None, end_sec=None, start_words=None, end_words=None):
