@@ -3,8 +3,8 @@ import pandas as pd
 from pandas import Timedelta as td
 import matplotlib.pyplot as plt
 import os
-from utils.audio_to_logits import infer_character_distribution, alphabet, STEP_MS
-from utils.text import preprocess_transcript, preprocess_audio
+from utils.audio_to_logits import infer_character_distribution, STEP_MS
+from utils.text import preprocess_transcript, preprocess_audio, Alphabet
 import pickle
 import struct
 import wave
@@ -54,13 +54,14 @@ class STSyncer:
     """Speech & Text Syncer"""
     WAV_AUDIO_FILE = 'in/in.wav'
 
-    def __init__(self, audio_file, txt_file, start_sec=None, end_sec=None, start_words=None, end_words=None):
+    def __init__(self, audio_file, txt_file, language='en', start_sec=None, end_sec=None, start_words=None, end_words=None):
         self.audio_file = audio_file
         self.txt_file = txt_file
         self.start_sec = start_sec
         self.end_sec = end_sec
         self.start_words = start_words
         self.end_words = end_words
+        self.lang = language
 
         self.path_cost = None
         self.wav_framerate = None
@@ -69,7 +70,7 @@ class STSyncer:
         word_ids = np.array([self.word_id_on_step_n(step) for step in range(len(self.path))])
         # indexes where next element != previous; word_starts[i] = first audio step of ith word
         word_starts = np.where(word_ids[1:] != word_ids[:-1])[0] + 1
-        pd.DataFrame(word_starts, columns=['start_step']).to_csv(save_to, index_label='word_id')
+        pd.DataFrame(word_starts, columns=['start_step']).to_csv(save_to, index_label='word_id', header=False)
 
     def make_animation(self, save_to='out/out.mp4'):
         print('Compiling an animation to visualize the result...')
@@ -157,6 +158,11 @@ class STSyncer:
 
     @property
     @lru_cache()
+    def alphabet(self):
+        return Alphabet(lang=self.lang)
+
+    @property
+    @lru_cache()
     def spaces_inds(self):
         return np.argwhere(self.transcript_inds == 0)[:, 0]
 
@@ -211,7 +217,7 @@ class STSyncer:
     @property
     @lru_cache()
     def transcript_inds(self):
-        trpt_ind_map = pd.Series(np.arange(len(self.alph)), index=self.alph)
+        trpt_ind_map = pd.Series(np.arange(len(self.alph_chars)), index=self.alph_chars)
 
         return trpt_ind_map[list(self.transcript)].values
 
@@ -240,7 +246,7 @@ class STSyncer:
     @property
     @lru_cache()
     def transcript(self):
-        return preprocess_transcript(self.txt_file, self.start_words, self.end_words)
+        return preprocess_transcript(self.txt_file, self.alphabet, self.start_words, self.end_words)
 
     @property
     @lru_cache()
@@ -255,7 +261,7 @@ class STSyncer:
         # with open("assets/logits.pickle", "rb") as f:  # for debugging: to not have to rerun DNN on the same file
         #     return pickle.load(f)
 
-        logits = infer_character_distribution(self.wav_audio_file)
+        logits = infer_character_distribution(self.wav_audio_file, self.lang)
         with open("assets/logits.pickle", "wb") as f:
             pickle.dump(logits, f)
 
@@ -289,8 +295,8 @@ class STSyncer:
 
     @property
     @lru_cache()
-    def alph(self):
-        return np.array(list(alphabet._str_to_label.keys()) + ['-'])
+    def alph_chars(self):
+        return np.array(list(self.alphabet._str_to_label.keys()) + ['-'])
 
     @property
     @lru_cache()

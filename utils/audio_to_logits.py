@@ -1,9 +1,18 @@
 import numpy as np
 import tensorflow as tf
+import tensorflow.compat.v1 as tfv1
 from tensorflow.python.ops import gen_audio_ops as contrib_audio
 from utils.text import Alphabet
 from tqdm import tqdm
 import os
+
+
+MODELS = dict(
+    en='assets/model.en.tflite',
+    pl='assets/model.pl.tflite',
+    de='assets/model.de.tflite',
+    es='assets/model.es.tflite',
+)
 
 n_input = 26
 n_context = 9
@@ -12,10 +21,6 @@ n_cell_dim = 2048
 WINDOW_MS = 32
 STEP_MS = 20  # feature extraction window step length
 
-MODEL_PATH = 'assets/model.pb'
-ALPHABET_PATH = 'assets/alphabet.txt'
-
-alphabet = Alphabet(os.path.abspath(ALPHABET_PATH))
 
 def samples_to_mfccs(samples, sample_rate):
     # 16000 = default sample rate
@@ -69,73 +74,59 @@ def create_overlapping_windows(batch_x):
     return batch_x
 
 
-def infer_character_distribution(input_file_path, model_file_path=MODEL_PATH):
-    """Load frozen graph, run inference and return most likely predicted characters"""
-    # Load frozen graph from file and parse it
-    with tf.io.gfile.GFile(model_file_path, "rb") as f:
-        graph_def = tf.compat.v1.GraphDef()
-        graph_def.ParseFromString(f.read())
+def infer_character_distribution(input_file_path, lang):
+    """Load model from checkpoint, run inference and return most likely predicted characters"""
+    inter = tf.lite.Interpreter(model_path=MODELS[lang])
+    inter.allocate_tensors()
 
-    with tf.Graph().as_default() as graph:
+    tensors = {}
+    tensor_details = inter.get_input_details() + inter.get_tensor_details() + inter.get_output_details()
+    for tensor in tensor_details:
+        tensors[tensor['name']] = tensor
 
-        tf.import_graph_def(graph_def, name="prefix")
+    with tf.compat.v1.Session() as session:
+        # Get input and output tensors
+        features, features_len = audiofile_to_features(input_file_path)
+        previous_state_c = np.zeros([1, n_cell_dim]).astype('float32')
+        previous_state_h = np.zeros([1, n_cell_dim]).astype('float32')
 
-        # currently hardcoded values used during inference
+        # Add batch dimension
+        features = tf.expand_dims(features, 0)
+        features_len = tf.expand_dims(features_len, 0)
 
-        with tf.compat.v1.Session(graph=graph) as session:
+        # Evaluate
+        features = create_overlapping_windows(features).eval(session=session)
+        features_len = features_len.eval(session=session)
 
-            features, features_len = audiofile_to_features(input_file_path)
-            previous_state_c = np.zeros([1, n_cell_dim])
-            previous_state_h = np.zeros([1, n_cell_dim])
+        logits = list()
 
-            # Add batch dimension
-            features = tf.expand_dims(features, 0)
-            features_len = tf.expand_dims(features_len, 0)
+        # the frozen model only accepts input split to 16 step chunks,
+        # if the inference was run from checkpoint instead (as in single inference in deepspeech script), this loop wouldn't be needed
+        for i in tqdm(range(0, features_len[0], n_steps)):
+            chunk = features[:, i:i + n_steps, :, :]
+            chunk_length = chunk.shape[1];
+            # pad with zeros if not enough steps (len(features) % FLAGS.n_steps != 0)
+            if chunk_length < n_steps:
+                chunk = np.pad(chunk,
+                               (
+                                   (0, 0),
+                                   (0, n_steps - chunk_length),
+                                   (0, 0),
+                                   (0, 0)
+                               ),
+                               mode='constant',
+                               constant_values=0)
 
-            # Evaluate
-            features = create_overlapping_windows(features).eval(session=session)
-            features_len = features_len.eval(session=session)
+            inter.set_tensor(tensors['input_node']['index'], chunk)
+            inter.set_tensor(tensors['previous_state_c']['index'], previous_state_c)
+            inter.set_tensor(tensors['previous_state_h']['index'], previous_state_h)
+            inter.invoke()
+            logits_step = inter.get_tensor(tensors['logits']['index'])
+            previous_state_c = inter.get_tensor(tensors['new_state_c']['index'])
+            previous_state_h = inter.get_tensor(tensors['new_state_h']['index'])
 
-            # we are interested only into logits, not CTC decoding
-            inputs = {'input': graph.get_tensor_by_name('prefix/input_node:0'),
-                      'previous_state_c': graph.get_tensor_by_name('prefix/previous_state_c:0'),
-                      'previous_state_h': graph.get_tensor_by_name('prefix/previous_state_h: 0'),
-                      'input_lengths': graph.get_tensor_by_name('prefix/input_lengths:0')}
-            outputs = {'outputs': graph.get_tensor_by_name('prefix/logits:0'),
-                       'new_state_c': graph.get_tensor_by_name('prefix/new_state_c:0'),
-                       'new_state_h': graph.get_tensor_by_name('prefix/new_state_h: 0'),
-                       }
+            logits.append(logits_step)
 
-            logits = np.empty([0, 1, alphabet.size() + 1])
+    logits = np.squeeze(np.concatenate(logits))
 
-            # the frozen model only accepts input split to 16 step chunks,
-            # if the inference was run from checkpoint instead (as in single inference in deepspeech script), this loop wouldn't be needed
-            for i in tqdm(range(0, features_len[0], n_steps)):
-                chunk = features[:, i:i + n_steps, :, :]
-                chunk_length = chunk.shape[1];
-                # pad with zeros if not enough steps (len(features) % FLAGS.n_steps != 0)
-                if chunk_length < n_steps:
-                    chunk = np.pad(chunk,
-                                   (
-                                       (0, 0),
-                                       (0, n_steps - chunk_length),
-                                       (0, 0),
-                                       (0, 0)
-                                   ),
-                                   mode='constant',
-                                   constant_values=0)
-
-                # need to update the states with each loop iteration
-                logits_step, previous_state_c, previous_state_h = session.run(
-                    [outputs['outputs'], outputs['new_state_c'], outputs['new_state_h']], feed_dict={
-                        inputs['input']: chunk,
-                        inputs['input_lengths']: [chunk_length],
-                        inputs['previous_state_c']: previous_state_c,
-                        inputs['previous_state_h']: previous_state_h,
-                    })
-
-                logits = np.concatenate((logits, logits_step))
-
-            logits = np.squeeze(logits)
-
-            return logits
+    return logits

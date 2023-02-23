@@ -11,23 +11,29 @@ from num2words import num2words
 
 from six.moves import range
 
+ALPHABETS = dict(
+    en='assets/alphabet.en.txt',
+    pl='assets/alphabet.pl.txt',
+    de='assets/alphabet.de.txt',
+    es='assets/alphabet.es.txt',
+)
 
 class Alphabet(object):
-    def __init__(self, config_file):
-        self._config_file = config_file
+    def __init__(self, lang='en'):
+        self.lang = lang
+        self._config_file = ALPHABETS[lang]
         self._label_to_str = {}
         self._str_to_label = {}
         self._size = 0
-        if config_file:
-            with codecs.open(config_file, 'r', 'utf-8') as fin:
-                for line in fin:
-                    if line[0:2] == '\\#':
-                        line = '#\n'
-                    elif line[0] == '#':
-                        continue
-                    self._label_to_str[self._size] = line[:-1]  # remove the line ending
-                    self._str_to_label[line[:-1]] = self._size
-                    self._size += 1
+        with codecs.open(self._config_file, 'r', 'utf-8') as fin:
+            for line in fin:
+                if line[0:2] == '\\#':
+                    line = '#\n'
+                elif line[0] == '#':
+                    continue
+                self._label_to_str[self._size] = line[:-1]  # remove the line ending
+                self._str_to_label[line[:-1]] = self._size
+                self._size += 1
 
     def _string_from_label(self, label):
         return self._label_to_str[label]
@@ -196,30 +202,52 @@ def validate_label(label):
     return label if label else None
 
 
-def preprocess_transcript_words(words: list):
+def preprocess_transcript_words(words: list, alphabet=Alphabet()):
     """
-    Prepares the text of the book to serve as a transcript: 'Some cool \n text;' -> ' some cool text '
-    1. Removes non-alphabetical characters
-    2. Converts newlines to spaces
-    3. Makes all characters lowercase
-    4. Pads the resulting string with spaces from each side
+    Prepares the given list of words to be used internally: ['Wørds', 'of', 'text!'] -> ' words of text '
+    This includes:
+    1. Converting non-ascii to closest ascii characters (except those that are part of the alphabet)
+    2. Doing basic conversion of numbers to letters
+    3. Removing all non-alphabet characters that didn't get processed away in previous two steps
+    4. Making all characters lowercase
+    5. Padding the resulting string with spaces from each side
 
     """
-    text = '\n'.join(words)
-    text = unidecode(text)
+    text = '\n'.join(words)  # convert words to new-line separated text for easier processing
+
+    chars = ''.join(alphabet._str_to_label).strip()  # alphabet as one string without space
+
+    # try to uni-decode non-ascii to ascii to not just throw them away (eg, naïve -> naive)
+    # find non-ascii characters that are part of alphabet and need to stay
+    non_ascii_letters = [letter for letter in alphabet._str_to_label if unidecode(letter) != letter]
+    if len(non_ascii_letters) > 0:
+        # split text into parts that can and cannot be unidecoded, unidecode, the former, and join all back together
+        # 'βåñøś' -> ['βå', 'ñ', 'øś'] -> ['ba', 'ñ', 'os'] -> 'baños'
+        sep = '([' + ''.join(non_ascii_letters) + '])+'  # separate by non-ascii chars, eg: '([ñ])+'
+        chunks = re.split(sep, text)  # split and preserve separators (non-ascii chars)
+        for i in range(0, len(chunks), 2):  # odd are always separators
+            chunks[i] = unidecode(chunks[i])  # so only unidecode even ones
+        text = ''.join(chunks)
+    else:  # if all letters are ascii (English), just unidecode the whole text
+        text = unidecode(text)
+
     text = text.strip().lower()
-    for i in range(3000, -1, -1):
-        text = text.replace(str(i), num2words(i, to='year').replace(' ', '').replace('-', ''))
-    text = re.compile(r"[^a-z\n']").sub('\n', text)
+
+    # do basic number preprocessing, '1921' -> 'nineteentwentyfive' to maintain them as one word
+    for i in range(1000, -1, -1):
+        text = text.replace(str(i), num2words(i, to='year', lang=alphabet.lang))
+
+    text = re.compile(fr"[^{chars}\n']").sub('', text)  # remove all non-alphabet characters that didn't get adapted
     text = re.compile(r'\n+').sub('\n', text)
     text = text.replace('\n', ' ').strip()
     return ' ' + text + ' '
 
 
-def preprocess_transcript(txt_file, start_words=None, end_words=None):
+def preprocess_transcript(txt_file, alphabet=Alphabet(), start_words=None, end_words=None):
     """
     Returns a transcript string consiting of
     :param txt_file: path to the .txt file where the original text is stored.
+    :param Alphabet alphabet: an Alphabet object specifying characters allowd in the alphabet (English by default)
     :param str start_words: first words to be included in the transcript from the original text, lowercase
     :param str end_words: last words to be included, also lowercase separated by spaces
 
@@ -230,7 +258,7 @@ def preprocess_transcript(txt_file, start_words=None, end_words=None):
 
     with open(txt_file, 'r') as f:
         text = f.read()
-    transcript = preprocess_transcript_words(text.split())
+    transcript = preprocess_transcript_words(text.split(), alphabet)
 
     start_i = transcript.find(start_words) - 1 if start_words is not None else 0
     end_i = transcript.find(end_words) + len(end_words) if end_words is not None else -1
