@@ -6,6 +6,8 @@ import codecs
 import numpy as np
 import re
 import struct
+from unidecode import unidecode
+from num2words import num2words
 
 from six.moves import range
 
@@ -194,7 +196,7 @@ def validate_label(label):
     return label if label else None
 
 
-def preprocess_transcript_text(true_text: str):
+def preprocess_transcript_words(words: list):
     """
     Prepares the text of the book to serve as a transcript: 'Some cool \n text;' -> ' some cool text '
     1. Removes non-alphabetical characters
@@ -203,7 +205,15 @@ def preprocess_transcript_text(true_text: str):
     4. Pads the resulting string with spaces from each side
 
     """
-    return ' ' + re.compile(r'\ +').sub(' ', re.compile(r"[^a-zA-Z\ ']").sub(' ', true_text)).lower() + ' '
+    text = '\n'.join(words)
+    text = unidecode(text)
+    text = text.strip().lower()
+    for i in range(3000, -1, -1):
+        text = text.replace(str(i), num2words(i, to='year').replace(' ', '').replace('-', ''))
+    text = re.compile(r"[^a-z\n']").sub('\n', text)
+    text = re.compile(r'\n+').sub('\n', text)
+    text = text.replace('\n', ' ').strip()
+    return ' ' + text + ' '
 
 
 def preprocess_transcript(txt_file, start_words=None, end_words=None):
@@ -220,7 +230,7 @@ def preprocess_transcript(txt_file, start_words=None, end_words=None):
 
     with open(txt_file, 'r') as f:
         text = f.read()
-    transcript = preprocess_transcript_text(text)
+    transcript = preprocess_transcript_words(text.split())
 
     start_i = transcript.find(start_words) - 1 if start_words is not None else 0
     end_i = transcript.find(end_words) + len(end_words) if end_words is not None else -1
@@ -233,7 +243,7 @@ def preprocess_audio(in_file, out_file='in/in.wav', start_sec=None, end_sec=None
     if os.path.exists(out_file):  # remove if temp wav file already exists
         os.remove(out_file)
 
-    cmd = f"""ffmpeg -i {in_file} -acodec pcm_s16le -ac 1 -ar 16000"""
+    cmd = f"""ffmpeg -i "{in_file}" -acodec pcm_s16le -ac 1 -ar 16000"""
 
     if start_sec is not None:
         cmd += f""" -ss {start_sec}"""
