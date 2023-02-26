@@ -212,7 +212,7 @@ class STSyncer:
                              self.transcript_inds.reshape(-1, 1),
                              radius=self.radius,
                              dist=dist,
-                             max_approximations=1)
+                             max_approximations=0)
         return path
 
     @property
@@ -252,7 +252,7 @@ class STSyncer:
     @property
     @lru_cache()
     def radius(self):
-        return 200
+        return 1000
 
     @property
     @lru_cache()
