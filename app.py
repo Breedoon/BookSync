@@ -17,37 +17,81 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 
 def main():
-    m = STSyncer(  # 20-second excerpt
-        audio_file='in/02.mp3',
-        txt_file='in/02.txt',
-        start_sec=11 * 60 + 33,  # 11:33
-        end_sec=11 * 60 + 53,  # 11:53
-        start_words='with the progressive dawn',
-        end_words='destination we did not know'
-    )
+    ## English
+    # book: Man's Search for Meaning
+    # source: Audible, also available in repo
+    STSyncer(  # english short
+        audio_file='in/en-27min.mp3',
+        txt_file='in/en-27min.txt',
+        language='en',
+        start_sec=89,
+        end_sec=125,
+        start_words='while these ordinary',
+        end_words='psychological basis'
+    ).make_animation(save_to='out/en-1min.mp4')
 
-    # m = STSyncer(  # 1-minute excerpt
-    #     audio_file='in/02.mp3',
-    #     txt_file='in/02.txt',
-    #     start_sec=89,
-    #     end_sec=125,
-    #     start_words='while these ordinary',
-    #     end_words='psychological basis'
-    # )
+    STSyncer(  # english long
+        audio_file='in/en-27min.mp3',
+        txt_file='in/en-27min.words',
+        language='en',
+    ).make_csv(save_to='out/en-27min.csv')
 
-    # m = STSyncer(  # 5-minute excerpt
-    #     audio_file='in/02.mp3',
-    #     txt_file='in/02.txt',
-    #     start_sec=3 * 60 + 7,  # 3:07
-    #     end_sec=8 * 60 + 47,  # 8:47
-    #     start_words='a definite number of',
-    #     end_words='lost their validity'
-    # )
-
-    # m = STSyncer('in/02.mp3', 'in/02.txt')  # full 27-minute excerpt
-
-    m.make_csv()
-    m.make_animation()
+    # ## Spanish
+    # # book: don Quijote
+    # # source: https://www.youtube.com/watch?v=bg36zXVce_A - first two chapters (+ in repo)
+    # STSyncer(  # spanish short
+    #     audio_file='in/es-25min.mp3',
+    #     txt_file='in/es-25min.words',
+    #     language='es',
+    #     end_sec=1 * 60 + 36,
+    #     end_words="punto de la verdad"
+    # ).make_animation(save_to='out/es-1min.mp4')
+    #
+    # STSyncer(  # spanish long
+    #     audio_file='in/es-25min.mp3',
+    #     txt_file='in/es-25min.words',
+    #     language='es',
+    # ).make_csv(save_to='out/es-25min.csv')
+    #
+    # ## Polish
+    # # book: Solaris
+    # # source: https://www.youtube.com/watch?v=h0X0avPQ_Y0
+    # STSyncer(  # polish short
+    #     audio_file='/Users/breedoon/Documents/temp/youtube/solaris/Lem Stanisław - Solaris ｜ Audiobook PL całość Thriller, Sensacja, Kryminał po polsku [h0X0avPQ_Y0].mp4',
+    #     txt_file='/Users/breedoon/Downloads/solaris-start.words',
+    #     start_sec=0 * 60 + 32,
+    #     end_sec=1 * 60 + 37,
+    #     start_words='o dziewiętnastej',
+    #     end_words='jedynego wskaźnika',
+    # ).make_animation(save_to='out/pl-1min.mp4')
+    #
+    # STSyncer(  # polish long
+    #     audio_file='/Users/breedoon/Documents/temp/youtube/solaris/Lem Stanisław - Solaris ｜ Audiobook PL całość Thriller, Sensacja, Kryminał po polsku [h0X0avPQ_Y0].mp4',
+    #     txt_file='/Users/breedoon/Downloads/solaris-start.words',
+    #     language='pl',
+    #     start_sec=0 * 60 + 32,
+    #     end_sec=27 * 60 + 38,
+    # ).make_csv(save_to='out/pl-27min.csv')
+    #
+    # ## German
+    # # book: Faust
+    # # source: https://www.youtube.com/watch?v=ba06Ptd7N5A
+    # STSyncer(  # german short
+    #     audio_file='/Users/breedoon/Documents/temp/youtube/faust/Johann Wolfgang von Goethe： FAUST I - [Teil 1⧸4] - Hörbuch [ba06Ptd7N5A].webm',
+    #     txt_file='in/de-19min.words',
+    #     language='de',
+    #     start_sec=0 * 60 + 4,
+    #     end_sec=1 * 60 + 11,
+    #     end_words='vor mir hinweggeschwunden'
+    # ).make_animation(save_to='out/de-1min.mp4')
+    #
+    # STSyncer(  # german long
+    #     audio_file='/Users/breedoon/Documents/temp/youtube/faust/Johann Wolfgang von Goethe： FAUST I - [Teil 1⧸4] - Hörbuch [ba06Ptd7N5A].webm',
+    #     txt_file='in/de-19min.words',
+    #     language='de',
+    #     start_sec=0 * 60 + 4,
+    #     end_sec=19 * 60 + 19,
+    # ).make_csv(save_to='out/de-19min-v2.csv')
 
 
 class STSyncer:
