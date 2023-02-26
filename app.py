@@ -192,7 +192,8 @@ class STSyncer:
         true_duration_steps = len(self.samples) // (self.wav_framerate * STEP_MS // 1000)
         shift_by_ts = len(self.logits) - true_duration_steps  # shift transcript back by 10 * 20 = 200 ms
         sub_path = np.array(self.full_path)
-        sub_path[:-shift_by_ts, 1] = sub_path[shift_by_ts:, 1]
+        if shift_by_ts != 0:  # if perfect length
+            sub_path[:-shift_by_ts, 1] = sub_path[shift_by_ts:, 1]
         self.path_cost = self.costs[sub_path[:, 0], self.transcript_inds[sub_path[:, 1]]]
         return sub_path
 
