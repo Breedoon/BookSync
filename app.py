@@ -259,6 +259,9 @@ class STSyncer:
     def logits(self):
         print('Running DNN to infer character probability distributions of the audio file...')
 
+        # for debugging: to not have to rerun DNN on the same file
+        # with open("assets/logits.pickle", "rb") as f:
+        #     return pickle.load(f)
         # if self.lang == 'en':
         #     with open("assets/logits-en-27min.pickle", "rb") as f:  # for debugging: to not have to rerun DNN on the same file
         #         return pickle.load(f)
