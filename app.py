@@ -258,8 +258,18 @@ class STSyncer:
     def logits(self):
         print('Running DNN to infer character probability distributions of the audio file...')
 
-        # with open("assets/logits.pickle", "rb") as f:  # for debugging: to not have to rerun DNN on the same file
-        #     return pickle.load(f)
+        # if self.lang == 'en':
+        #     with open("assets/logits-en-27min.pickle", "rb") as f:  # for debugging: to not have to rerun DNN on the same file
+        #         return pickle.load(f)
+        # if self.lang == 'es':
+        #     with open("assets/logits-es-25min.pickle", "rb") as f:  # for debugging: to not have to rerun DNN on the same file
+        #         return pickle.load(f)
+        # if self.lang == 'pl':
+        #     with open("assets/logits-pl-27min.pickle", "rb") as f:  # for debugging: to not have to rerun DNN on the same file
+        #         return pickle.load(f)
+        # if self.lang == 'de':
+        #     with open("assets/logits-de-19min.pickle", "rb") as f:  # for debugging: to not have to rerun DNN on the same file
+        #         return pickle.load(f)
 
         logits = infer_character_distribution(self.wav_audio_file, self.lang)
         with open("assets/logits.pickle", "wb") as f:
